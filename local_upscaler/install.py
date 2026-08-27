@@ -31,6 +31,19 @@ from . import paths
 
 APP_ID = "local-upscaler"
 
+#: Advertised under "Open With". A .desktop MimeType line cannot be wrapped, so
+#: it is assembled here rather than written out inside the template.
+#:
+#: Extensions do not appear here — the system mime database maps them. That is
+#: why `.jfif` files already offered this app from the file manager while the
+#: in-app dialog was still hiding them: shared-mime-info resolves `.jfif` to
+#: image/jpeg, which was declared all along.
+MIME_TYPES = (
+    "image/png", "image/jpeg", "image/webp", "image/avif", "image/bmp",
+    "image/tiff", "image/gif", "image/jp2", "image/x-portable-pixmap",
+    "image/x-portable-graymap", "image/x-pcx", "image/vnd.microsoft.icon",
+)
+
 DESKTOP_TEMPLATE = """[Desktop Entry]
 Type=Application
 Version=1.0
@@ -43,7 +56,7 @@ Icon={icon}
 Terminal=false
 Categories=Graphics;Photography;2DGraphics;RasterGraphics;
 Keywords=upscale;upscaler;enlarge;resize;super-resolution;esrgan;ai;image;
-MimeType=image/png;image/jpeg;image/webp;image/bmp;image/tiff;
+MimeType={mime_types}
 StartupWMClass=local-upscaler
 X-KDE-StartupNotify=true
 """
@@ -184,7 +197,8 @@ def install(verbose: bool = True) -> int:
     try:
         dest_desktop.parent.mkdir(parents=True, exist_ok=True)
         dest_desktop.write_text(DESKTOP_TEMPLATE.format(
-            exec_line=exec_line, try_exec=try_exec, icon=APP_ID))
+            exec_line=exec_line, try_exec=try_exec, icon=APP_ID,
+            mime_types=";".join(MIME_TYPES) + ";"))
         dest_desktop.chmod(0o644)
         say(f"launcher  -> {dest_desktop}")
         say(f"            Exec={exec_line}")

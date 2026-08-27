@@ -14,10 +14,12 @@ Upscale downloads it as the first stage of the run.
 
 from __future__ import annotations
 
+import mimetypes
 from pathlib import Path
 
+from PIL import Image
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QImage, QPixmap
+from PySide6.QtGui import QImage, QImageReader, QPixmap
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QFileDialog, QFormLayout,
                                QFrame, QGroupBox, QHBoxLayout, QLabel,
                                QPushButton, QSizePolicy, QVBoxLayout, QWidget)
@@ -26,9 +28,52 @@ from .. import settings as st
 from ..engine import catalog, fetch, runner, tiling
 from . import metrics as me
 
-#: What QImageReader can open in practice, as a file dialog filter.
-IMAGE_FILTER = ("Images (*.png *.jpg *.jpeg *.webp *.bmp *.tif *.tiff *.ppm *.pgm);;"
-                "All files (*)")
+#: Extensions listed first in the dialog, because they are what people actually
+#: have. Everything else the libraries can open is appended after these.
+_COMMON_EXTENSIONS = ("png", "jpg", "jpeg", "jfif", "webp", "avif",
+                      "tif", "tiff", "bmp", "gif")
+
+
+def readable_extensions() -> tuple[str, ...]:
+    """Extensions both Pillow and Qt can open on this machine.
+
+    Derived, not typed out, and that is the point. This list was hand-written
+    once and omitted `.jfif` — which is not an obscure format but *ordinary
+    JPEG*: JFIF is the container JPEG has always used, and Windows and Edge hand
+    out `.jfif` when you save an image from the web. Both libraries read it
+    happily, so the only thing rejecting those files was a string in this module.
+
+    Any hand-maintained list has that failure mode, because formats have aliases
+    (`.jpg`/`.jpeg`/`.jfif`/`.jpe` are one format) and nobody remembers all of
+    them. Asking the libraries removes the chance to forget, and picks up
+    formats whose plugins are installed later without an edit here.
+
+    Both libraries have to agree: Pillow does the tiling, and Qt draws the
+    thumbnail and the original in the comparison view.
+    """
+    Image.init()                      # populate Image.EXTENSION with all plugins
+    qt_mimes = {bytes(m).decode().lower()
+                for m in QImageReader.supportedMimeTypes()}
+    found = set()
+    for extension, plugin in Image.EXTENSION.items():
+        if plugin not in Image.OPEN:
+            continue                  # Pillow can write it but not read it
+        mime, _ = mimetypes.guess_type("x" + extension)
+        if mime and mime in qt_mimes:
+            found.add(extension.lstrip(".").lower())
+    # Guarantee the basics even if the mime database is unusual, so the dialog
+    # can never come out empty on a stripped-down system.
+    found.update(("png", "jpg", "jpeg"))
+    return tuple(sorted(found))
+
+
+def image_filter() -> str:
+    """The open dialog's filter string, common formats named first."""
+    every = readable_extensions()
+    ordered = ([e for e in _COMMON_EXTENSIONS if e in every]
+               + [e for e in every if e not in _COMMON_EXTENSIONS])
+    patterns = " ".join(f"*.{e}" for e in ordered)
+    return f"Images ({patterns});;All files (*)"
 
 #: Refuse to start above this many output pixels; the result would not fit in
 #: RAM on the machine this targets. 8000x8000 at 4x is already 1 GP.
@@ -87,7 +132,8 @@ class SetupPage(QWidget):
         font.setBold(True)
         self._name.setFont(font)
         self._name.setWordWrap(True)
-        self._dims = QLabel("Choose a PNG, JPEG or WebP to get started.")
+        self._dims = QLabel("Choose an image to get started — "
+                            "PNG, JPEG, WebP, AVIF, TIFF and more.")
         self._dims.setWordWrap(True)
         self._open = QPushButton("Open Image…")
         self._open.setDefault(True)
@@ -259,18 +305,33 @@ class SetupPage(QWidget):
     # -- image ------------------------------------------------------------
     def _choose_file(self) -> None:
         start = self._settings.last_open_dir or str(Path.home())
-        name, _ = QFileDialog.getOpenFileName(self, "Open Image", start, IMAGE_FILTER)
+        name, _ = QFileDialog.getOpenFileName(self, "Open Image", start,
+                                      image_filter())
         if name:
             self.load_image(Path(name))
 
     def load_image(self, path: Path) -> bool:
+        """Load `path` for preview, or report why it cannot be used.
+
+        Both libraries are checked here rather than only Qt. Qt draws the
+        thumbnail and the comparison view, but Pillow does the tiling, and a
+        file only one of them understands would otherwise be accepted happily
+        and then fail several seconds into a run. Pillow's `open` reads the
+        header only, so this costs nothing even for a very large image.
+
+        Neither check looks at the extension — both sniff the content — so a
+        correctly-formed image opens whatever it is named.
+        """
         image = QImage(str(path))
         if image.isNull():
-            self._name.setText("Could not read that file")
-            self._dims.setText(f"{path.name} is not an image this app can open.")
-            self._thumb.clear()
-            self._source = None
-            self._refresh()
+            self._reject(path, "is not an image this app can open.")
+            return False
+        try:
+            with Image.open(path) as probe:
+                probe.verify()
+        except Exception as e:                              # noqa: BLE001
+            # Pillow raises a wide variety of types for a damaged file.
+            self._reject(path, f"cannot be read for upscaling: {e}")
             return False
         self._source = path
         self._source_size = (image.width(), image.height())
@@ -282,6 +343,20 @@ class SetupPage(QWidget):
         self._name.setText(path.name)
         self._refresh()
         return True
+
+    def _reject(self, path: Path, reason: str) -> None:
+        """Clear the selection and say why.
+
+        `_refresh` rewrites the detail line for the no-image case, so it has to
+        run *before* the reason is written or it overwrites it with the generic
+        placeholder — which is how a rejected file used to report nothing more
+        useful than "choose an image".
+        """
+        self._thumb.clear()
+        self._source = None
+        self._refresh()
+        self._name.setText("Could not read that file")
+        self._dims.setText(f"{path.name} {reason}")
 
     @property
     def source(self) -> Path | None:
@@ -312,7 +387,8 @@ class SetupPage(QWidget):
 
         if self._source is None:
             self._go.setEnabled(False)
-            self._dims.setText("Choose a PNG, JPEG or WebP to get started.")
+            self._dims.setText("Choose an image to get started — "
+                               "PNG, JPEG, WebP, AVIF, TIFF and more.")
             self._estimate.setText(
                 f"{model.label} needs a {human_bytes(pending)} download."
                 if pending else f"{model.label} is downloaded and ready.")

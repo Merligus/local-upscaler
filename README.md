@@ -79,6 +79,12 @@ bin/local-upscaler photo.jpg        # start with an image already loaded
 
 Images also offer it under **Open With** once `--install` has been run.
 
+**Formats.** Whatever both Pillow and Qt can open on your machine — PNG, JPEG
+(including `.jfif` and `.jpe`, which are just JPEG), WebP, AVIF, TIFF, BMP, GIF,
+JPEG 2000, Netpbm and more. The list is derived from the installed libraries
+rather than hard-coded, so installing an image plugin makes its format available
+without any change here. Output is saved as PNG, JPEG or WebP.
+
 Inside the result view: drag to pan, scroll to zoom, double-click to toggle
 between fit and 100%. `0` fits, `1` goes to 100%, `+`/`-` zoom. In **Compare**,
 drag the vertical handle to wipe between before and after.
@@ -166,6 +172,7 @@ original hosts at runtime.
 | Menu entry missing after `--install` | Log out and back in, or run `kbuildsycoca6 --noincremental` |
 | Icon missing in the launcher | A stale `~/.local/share/icons/hicolor/icon-theme.cache`. `--install` removes it; delete it by hand if needed |
 | A visible seam in the output | Set **Advanced → Tiling: Single pass** and file a bug with the image |
+| Your image is not listed in the open dialog | Switch the filter to **All files** — the app sniffs content, not extensions. If it then opens fine, that is a bug worth reporting |
 | Result is huge / runs out of RAM | A 12 MP source at 4x is a 192 MP image. Use **Output size** to ask for less |
 
 ## Development
@@ -175,6 +182,7 @@ python3 tests/test_tiling.py            # the tile geometry — the load-bearing
 python3 tests/test_catalog.py
 python3 tests/test_settings.py
 python3 tests/test_desktop_and_help.py
+python3 tests/test_image_formats.py
 
 python3 tests/test_catalog_remote.py    # needs network — see below
 ```
