@@ -283,7 +283,9 @@ class ImageView(QWidget):
     def mousePressEvent(self, event) -> None:
         if event.button() != Qt.MouseButton.LeftButton or not self.has_content:
             return
-        if self._mode == MODE_COMPARE and abs(event.position().x() - self._handle_x()) <= HANDLE_GRAB:
+        near_handle = (self._mode == MODE_COMPARE
+                       and abs(event.position().x() - self._handle_x()) <= HANDLE_GRAB)
+        if near_handle:
             self._grabbing_handle = True
         else:
             self._panning = True

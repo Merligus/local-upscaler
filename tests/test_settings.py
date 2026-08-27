@@ -35,10 +35,12 @@ def check(cond, msg):
 def test_defaults():
     print("\ndefaults")
     s = st.Settings()
-    check(s.model_id == catalog.DEFAULT_MODEL_ID, "the default model is the catalog default")
+    check(s.model_id == catalog.DEFAULT_MODEL_ID,
+          "the default model is the catalog default")
     check(s.engine_tile == st.DEFAULT_ENGINE_TILE, "engine tile defaults to 128")
     check(s.outer_tile is None, "outer tile defaults to auto")
-    check(s.device == "auto" and s.gpu_arg() is None, "device defaults to auto (-g omitted)")
+    check(s.device == "auto" and s.gpu_arg() is None,
+          "device defaults to auto (-g omitted)")
     check(st.Settings(device="cpu").gpu_arg() == -1, "device=cpu maps to -g -1")
     check(s.compare_filter == "nearest", "the comparison shows real pixels by default")
 
@@ -65,7 +67,8 @@ def test_garbage_tolerance():
                                "engine_tile": None, "device": "quantum",
                                "compare_filter": 7, "outer_tile": "x",
                                "calibration": "not a dict"})
-    check(s.model_id == catalog.DEFAULT_MODEL_ID, "an unknown model falls back to the default")
+    check(s.model_id == catalog.DEFAULT_MODEL_ID,
+          "an unknown model falls back to the default")
     check(s.scale in s.model().scales, "a nonsense scale falls back to a supported one")
     check(s.engine_tile == st.DEFAULT_ENGINE_TILE, "a null engine tile falls back")
     check(s.device == "auto", "an unknown device falls back to auto")
@@ -125,7 +128,8 @@ def test_calibration_blending():
     check(c.get("m", 4) == 100.0, "the first measurement is taken as-is")
     c.record("m", 4, 50.0)
     blended = c.get("m", 4)
-    check(50.0 < blended < 100.0, f"a later measurement blends rather than replaces ({blended})")
+    check(50.0 < blended < 100.0,
+          f"a later measurement blends rather than replaces ({blended})")
     c.record("m", 4, 0)
     check(c.get("m", 4) == blended, "a zero measurement is ignored")
     c.record("m", 4, -5)

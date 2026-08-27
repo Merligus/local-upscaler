@@ -30,7 +30,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PIL import Image
-from PySide6.QtCore import QThread, Qt
+from PySide6.QtCore import QThread
 from PySide6.QtGui import QGuiApplication, QImage
 from PySide6.QtWidgets import QMainWindow, QMessageBox, QStackedWidget
 

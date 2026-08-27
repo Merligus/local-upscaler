@@ -23,20 +23,28 @@ would have seen in a whole-image pass.
 
 `DEFAULT_CONTEXT = 48` is **measured, not guessed**. Upstream's internal tiling
 uses a `prepadding` of only 10 px, which suggested a much smaller margin would
-do. It does not. Against a genuinely untiled reference (a 256x256 source run
-with `-t 256`, so the binary does no tiling of its own), upscaled with
-`ultrasharp-4x` at 4x and compared as mean absolute error in an 8 px band on the
-tile boundaries versus everywhere else:
+do. It does not.
 
-    ctx=24   boundary band 1.12x the surrounding error   <- a real seam
-    ctx=48   boundary band 0.99x                         <- indistinguishable
-    ctx=96   boundary band 0.97x                         <- no further gain
+The measurement: a 256x256 crop of a photograph, upscaled 4x with
+`upscayl-standard-4x`, tiled here at 128 px so boundaries fall every 512 output
+pixels, and compared against the same image upscaled with the engine's tile set
+to the full width so that it does no tiling at all. "band" is the mean absolute
+error in an 8 px strip on the tile boundaries, "else" the same everywhere else.
 
-A ratio of 1.0 means the boundary is statistically no different from anywhere
-else, which is the only thing that matters: a *discontinuity* along a straight
-line is visible to the eye at magnitudes that random error of the same size is
-not. 48 is where that discontinuity disappears, and 96 buys nothing for its
-extra cost, so 48 it is.
+    ctx    max abs diff    band/else
+      0        70            5.05x     a plainly visible seam
+     24         4            3.10x     measurable
+     48         1            1.32x     <- shipped
+     96         1            1.03x     no better where it counts
+
+The number that decides it is the maximum, not the ratio. At 48 the worst pixel
+in the image differs by a single quantisation level, which cannot be displayed,
+let alone seen; the residual 1.32x ratio is the quotient of two quantities that
+are both far below perceptibility. Going to 96 flattens that ratio but does not
+improve the maximum, and it is not free: the margin is added on both sides of
+every tile, so at a 384 px tile it takes the processed area from 1.56x the useful
+area to 2.25x. That is a 44% longer run for a change from invisible to
+invisible.
 
 One trap worth recording, because it cost an hour and would cost it again.
 Comparing against a reference that was itself produced with the binary's

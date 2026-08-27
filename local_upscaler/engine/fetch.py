@@ -100,7 +100,8 @@ def _download(url: str, dest: Path, expect_bytes: int | None = None,
             f"The download was truncated, or the URL now serves something else.")
     if sha256 is not None and digest.hexdigest() != sha256:
         part.unlink(missing_ok=True)
-        raise FetchError(f"{dest.name}: checksum mismatch — the file is not what it should be.")
+        raise FetchError(f"{dest.name}: checksum mismatch — the file is not "
+                         f"what it should be.")
     os.replace(part, dest)
 
 
@@ -118,7 +119,8 @@ def missing(model: Model, scale: int) -> list[Path]:
     module existed — or a file truncated by a full disk — is re-downloaded
     rather than handed to the engine.
     """
-    expected = dict(zip(model.filenames(scale), (model.param_bytes, model.bin_bytes)))
+    expected = dict(zip(model.filenames(scale),
+                       (model.param_bytes, model.bin_bytes)))
     out = []
     for p in model_paths(model, scale):
         try:
@@ -175,7 +177,8 @@ def fetch_engine(progress: ProgressCb | None = None,
     try:
         with zipfile.ZipFile(archive) as z:
             member = next((n for n in z.namelist()
-                           if Path(n).name == binary.ENGINE_MEMBER and not n.endswith("/")), None)
+                           if Path(n).name == binary.ENGINE_MEMBER
+                           and not n.endswith("/")), None)
             if member is None:
                 raise FetchError(f"{archive.name} does not contain {binary.ENGINE_MEMBER}")
             with z.open(member) as src, part.open("wb") as f:

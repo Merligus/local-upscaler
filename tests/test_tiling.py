@@ -61,7 +61,8 @@ def test_cores_tile_exactly():
                         overlap = True
                     covered.add((x, y))
         check(len(covered) == w * h and not overlap,
-              f"{w}x{h} tile={t}: {len(tiles)} cores cover every pixel once")
+              f"{w}x{h} tile={t}: {len(tiles)} cores cover "
+              f"every pixel once")
 
 
 def test_pad_contains_core_and_stays_in_bounds():
@@ -84,7 +85,8 @@ def test_empty_and_degenerate():
     print("\ndegenerate inputs")
     check(tl.plan_tiles(0, 100, 64) == [], "zero width plans no tiles")
     check(tl.plan_tiles(100, 0, 64) == [], "zero height plans no tiles")
-    check(len(tl.plan_tiles(10, 10, 999)) == 1, "a tile larger than the image gives one tile")
+    check(len(tl.plan_tiles(10, 10, 999)) == 1,
+          "a tile larger than the image gives one tile")
     check(len(tl.plan_tiles(10, 10, 64, 0)) == 1, "ctx=0 is allowed")
     t = tl.plan_tiles(10, 10, 64, 0)[0]
     check(t.core == t.pad == (0, 0, 10, 10), "with ctx=0 the pad equals the core")
@@ -115,7 +117,8 @@ def _round_trip(width, height, tile, ctx, scale, mode="RGB", seed=1):
         for t in tiles:                                   # the stub engine
             with Image.open(din / f"{t.name}.png") as im:
                 w, h = im.size
-                im.resize((w * scale, h * scale), Image.NEAREST).save(dout / f"{t.name}.png")
+                out = im.resize((w * scale, h * scale), Image.NEAREST)
+                out.save(dout / f"{t.name}.png")
         got = tl.reassemble(tiles, dout, (width, height), scale, mode)
     want = src.resize((width * scale, height * scale), Image.NEAREST)
     return got, want

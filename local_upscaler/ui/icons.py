@@ -35,7 +35,7 @@ import os
 import re
 from pathlib import Path
 
-from PySide6.QtCore import QByteArray, QEvent, QObject, QSize, Qt
+from PySide6.QtCore import QByteArray, QEvent, QObject, Qt
 from PySide6.QtGui import QColor, QGuiApplication, QIcon, QImage, QPalette, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 
