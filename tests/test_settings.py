@@ -21,7 +21,7 @@ os.environ["XDG_DATA_HOME"] = str(_ROOT / "data")
 os.environ["XDG_CACHE_HOME"] = str(_ROOT / "cache")
 
 from local_upscaler import paths, settings as st  # noqa: E402
-from local_upscaler.engine import catalog  # noqa: E402
+from local_upscaler.engine import catalog, runner  # noqa: E402
 
 FAILS = []
 
@@ -139,6 +139,51 @@ def test_calibration_blending():
           "an unparseable rate is dropped")
 
 
+def test_throughput_is_size_independent():
+    """The bug this guards: `elapsed / mpx` is not a property of the model.
+
+    Every run pays a fixed startup cost, so dividing total time by megapixels
+    gives a figure that changes with image size — and small runs then poison the
+    stored calibration for large ones. These are four real timings of
+    `upscayl-standard-4x` on one machine; the corrected figure must agree across
+    all of them far better than the naive one.
+    """
+    print("\nthroughput is a model property, not an image-size property")
+    model = catalog.get("upscayl-standard-4x")
+    runs = [(0.262, 15.2), (1.048, 49.0), (0.130, 9.1), (2.074, 91.9)]
+
+    naive = [el / mp for mp, el in runs]
+    fixed = [runner.throughput(model, el, mp) for mp, el in runs]
+    spread = lambda v: (max(v) - min(v)) / (sum(v) / len(v))
+    check(spread(naive) > 0.4,
+          f"the naive elapsed/mpx really does vary with size ({spread(naive):.0%})")
+    check(spread(fixed) < 0.15,
+          f"startup-corrected throughput is stable across sizes ({spread(fixed):.0%})")
+
+    # And the round trip: the prior should predict the runs it was fitted to.
+    for mp, el in runs:
+        side = int((mp * 1e6) ** 0.5)
+        predicted = runner.estimate_seconds(model, side, side)
+        check(abs(predicted - el) < max(3.0, 0.15 * el),
+              f"{side}x{side}: predicted {predicted:.0f}s vs measured {el:.0f}s")
+
+    check(runner.throughput(model, 10.0, 0) == 0.0, "a zero-megapixel run reports 0")
+    check(runner.throughput(model, 0.1, 1.0) > 0,
+          "a run faster than its startup prior still reports a positive rate")
+
+
+def test_estimate_uses_calibration():
+    print("\nthe estimate prefers a measured rate over the prior")
+    model = catalog.get("upscayl-standard-4x")
+    prior = runner.estimate_seconds(model, 1000, 1000)
+    faster = runner.estimate_seconds(model, 1000, 1000, sec_per_mpx=10.0)
+    check(faster < prior, "a measured rate of 10 s/MP predicts less than the prior")
+    check(abs(faster - (model.startup_s + 10.0)) < 0.01,
+          "the estimate is startup + rate * megapixels")
+    check(runner.estimate_seconds(model, 1000, 1000, sec_per_mpx=0) == prior,
+          "a zero rate falls back to the prior instead of predicting instant")
+
+
 def test_disk_round_trip():
     print("\npersistence to disk")
     s = st.Settings(model_id="remacri-4x", engine_tile=64)
@@ -158,7 +203,8 @@ def test_disk_round_trip():
 def main():
     for fn in (test_defaults, test_round_trip, test_garbage_tolerance, test_clamping,
                test_scale_must_match_model, test_output_scale, test_unknown_keys_survive,
-               test_calibration_blending, test_disk_round_trip):
+               test_calibration_blending, test_throughput_is_size_independent,
+               test_estimate_uses_calibration, test_disk_round_trip):
         fn()
     print(f"\n{'FAILED: ' + str(len(FAILS)) if FAILS else 'all passed'}")
     for f in FAILS:

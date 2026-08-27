@@ -108,7 +108,8 @@ class Job:
 class Result:
     image: Image.Image
     elapsed: float
-    #: Wall seconds per megapixel of *input*, for `settings.Calibration`.
+    #: Seconds per input megapixel with the run's fixed startup cost removed —
+    #: a throughput figure, not `elapsed / mpx`. See `throughput`.
     sec_per_mpx: float
     tiles: int
     source_size: tuple[int, int]
@@ -212,7 +213,7 @@ class Runner:
         elapsed = time.monotonic() - started
         mpx = (width * height) / 1e6
         return Result(image=out, elapsed=elapsed,
-                      sec_per_mpx=elapsed / mpx if mpx else 0.0,
+                      sec_per_mpx=throughput(job.model, elapsed, mpx),
                       tiles=len(tiles), source_size=(width, height),
                       output_size=out.size)
 
@@ -288,6 +289,29 @@ class Runner:
         target = (max(1, round(w * factor)), max(1, round(h * factor)))
         self._stage(STAGE_ASSEMBLE, f"Resampling to {want}x…")
         return image.resize(target, Image.LANCZOS)
+
+
+def throughput(model: Model, elapsed: float, mpx: float) -> float:
+    """Seconds per input megapixel, with the fixed startup cost taken out.
+
+    This distinction is not pedantic, and getting it wrong produced a real bug.
+    Every run pays a few seconds for Vulkan init and model load regardless of
+    image size, so the naive `elapsed / mpx` is not a property of the model at
+    all — it is a property of the model *and the image size*. Measured on one
+    machine with `upscayl-standard-4x`, the naive figure ranged from 44 s/MP on a
+    2.1 MP image to 70 s/MP on a 0.13 MP one. Feeding those into
+    `settings.Calibration` let a couple of thumbnail-sized runs push the stored
+    rate to 67 s/MP, which would then have predicted 151 s for a 1080p image that
+    actually takes 92 s.
+
+    Subtracting the startup prior first collapses that spread to about 7%, which
+    makes the number safe to average across runs of any size.
+    """
+    if mpx <= 0:
+        return 0.0
+    # Floor rather than clamp to zero: a run faster than its own startup prior
+    # means the prior is too high, not that the model is infinitely fast.
+    return max(0.05, elapsed - model.startup_s) / mpx
 
 
 def plan_tile_size(width: int, height: int, override: int | None = None) -> int:

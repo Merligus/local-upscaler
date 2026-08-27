@@ -91,8 +91,12 @@ class Model:
 # machine (GTX 1050 Ti, 4 GB, Pascal) at `-t 128`, fitting wall time against
 # 512x512 and 1024x1024 inputs at 4x:
 #
-#     ultrasharp-4x     (33 MB RRDBNet-23)   49.4 s/MP,  12.8 s startup
-#     upscayl-lite-4x   (2.4 MB SRVGGNet)     8.7 s/MP,   1.7 s startup
+#     upscayl-standard-4x  (33 MB RRDBNet-23)   43.0 s/MP,  3.9 s startup
+#     upscayl-lite-4x      (2.4 MB SRVGGNet)     3.5 s/MP,  1.2 s startup
+#
+# Fitted across 0.13, 0.26, 1.05 and 2.07 MP inputs through this app's own tiled
+# pipeline, with a warm ncnn shader cache. `sec_per_mpx` is throughput with the
+# startup cost already removed — see `runner.throughput` for why that matters.
 #
 # Everything else is scaled from those two by architecture and parameter count,
 # so treat the other rows as informed estimates rather than measurements. They
@@ -105,7 +109,7 @@ MODELS: tuple[Model, ...] = (
         author="Xintao Wang et al.", licence="BSD-3-Clause",
         url="https://github.com/xinntao/Real-ESRGAN",
         base_url=_UPSCAYL, param_bytes=116029, bin_bytes=33424520,
-        sec_per_mpx=49.0, startup_s=13.0,
+        sec_per_mpx=43.0, startup_s=3.9,
     ),
     Model(
         id="ultrasharp-4x", label="4x UltraSharp", scales=(4,),
@@ -113,7 +117,7 @@ MODELS: tuple[Model, ...] = (
         author="Kim2091", licence="CC-BY-NC-SA-4.0",
         url="https://openmodeldb.info/models/4x-UltraSharp",
         base_url=_UPSCAYL, param_bytes=116029, bin_bytes=33424520,
-        sec_per_mpx=49.4, startup_s=12.8,
+        sec_per_mpx=43.0, startup_s=3.9,
     ),
     Model(
         id="remacri-4x", label="4x Remacri", scales=(4,),
@@ -121,7 +125,7 @@ MODELS: tuple[Model, ...] = (
         author="FoolhardyVEVO", licence="CC-BY-NC-SA-4.0",
         url="https://openmodeldb.info/models/4x-Remacri",
         base_url=_UPSCAYL, param_bytes=140295, bin_bytes=33424520,
-        sec_per_mpx=49.0, startup_s=13.0,
+        sec_per_mpx=43.0, startup_s=3.9,
     ),
     Model(
         id="ultramix-balanced-4x", label="4x UltraMix Balanced", scales=(4,),
@@ -129,7 +133,7 @@ MODELS: tuple[Model, ...] = (
         author="Kim2091", licence="CC-BY-NC-SA-4.0",
         url="https://openmodeldb.info/models/4x-UltraMix-Balanced",
         base_url=_UPSCAYL, param_bytes=140295, bin_bytes=33424520,
-        sec_per_mpx=49.0, startup_s=13.0,
+        sec_per_mpx=43.0, startup_s=3.9,
     ),
     Model(
         id="high-fidelity-4x", label="High Fidelity", scales=(4,),
@@ -137,7 +141,7 @@ MODELS: tuple[Model, ...] = (
         author="Upscayl", licence="see OpenModelDB",
         url="https://openmodeldb.info/",
         base_url=_UPSCAYL, param_bytes=108039, bin_bytes=33424520,
-        sec_per_mpx=49.0, startup_s=13.0,
+        sec_per_mpx=43.0, startup_s=3.9,
     ),
     Model(
         id="digital-art-4x", label="Digital Art", scales=(4,),
@@ -145,7 +149,7 @@ MODELS: tuple[Model, ...] = (
         author="Upscayl", licence="see OpenModelDB",
         url="https://openmodeldb.info/",
         base_url=_UPSCAYL, param_bytes=30290, bin_bytes=8943500,
-        sec_per_mpx=16.0, startup_s=5.0,
+        sec_per_mpx=13.0, startup_s=2.5,
     ),
     Model(
         id="upscayl-lite-4x", label="Upscayl Lite", scales=(4,),
@@ -153,7 +157,7 @@ MODELS: tuple[Model, ...] = (
         author="Upscayl", licence="see OpenModelDB",
         url="https://openmodeldb.info/",
         base_url=_UPSCAYL, param_bytes=5019, bin_bytes=2435272,
-        sec_per_mpx=8.7, startup_s=1.7,
+        sec_per_mpx=3.5, startup_s=1.2,
     ),
     Model(
         id="realesr-animevideov3", label="Anime Video v3", scales=(2, 3, 4),
@@ -161,7 +165,7 @@ MODELS: tuple[Model, ...] = (
         author="Xintao Wang et al.", licence="BSD-3-Clause",
         url="https://github.com/xinntao/Real-ESRGAN/blob/master/docs/anime_video_model.md",
         base_url=_CUSTOM, param_bytes=3173, bin_bytes=1247368,
-        sec_per_mpx=5.0, startup_s=1.5,
+        sec_per_mpx=2.2, startup_s=1.0,
     ),
     Model(
         id="4xNomos8kSC", label="4x Nomos8k SC", scales=(4,),
@@ -169,7 +173,7 @@ MODELS: tuple[Model, ...] = (
         author="Phhofm", licence="CC-BY-4.0",
         url="https://openmodeldb.info/models/4x-Nomos8kSC",
         base_url=_CUSTOM, param_bytes=108039, bin_bytes=33424520,
-        sec_per_mpx=49.0, startup_s=13.0,
+        sec_per_mpx=43.0, startup_s=3.9,
     ),
     Model(
         id="4x_NMKD-Siax_200k", label="4x NMKD Siax", scales=(4,),
@@ -177,7 +181,7 @@ MODELS: tuple[Model, ...] = (
         author="NMKD", licence="CC-BY-NC-SA-4.0",
         url="https://openmodeldb.info/models/4x-NMKD-Siax-CX",
         base_url=_CUSTOM, param_bytes=108037, bin_bytes=66793352,
-        sec_per_mpx=95.0, startup_s=20.0,
+        sec_per_mpx=86.0, startup_s=6.0,
     ),
     Model(
         id="4x_NMKD-Superscale-SP_178000_G", label="4x NMKD Superscale", scales=(4,),
@@ -185,7 +189,7 @@ MODELS: tuple[Model, ...] = (
         author="NMKD", licence="CC-BY-NC-SA-4.0",
         url="https://openmodeldb.info/models/4x-NMKD-Superscale",
         base_url=_CUSTOM, param_bytes=108037, bin_bytes=66793352,
-        sec_per_mpx=95.0, startup_s=20.0,
+        sec_per_mpx=86.0, startup_s=6.0,
     ),
     Model(
         id="4xLSDIRplusC", label="4x LSDIR plus C", scales=(4,),
@@ -193,7 +197,7 @@ MODELS: tuple[Model, ...] = (
         author="Phhofm", licence="CC-BY-4.0",
         url="https://openmodeldb.info/models/4x-LSDIRplusC",
         base_url=_CUSTOM, param_bytes=108039, bin_bytes=33424520,
-        sec_per_mpx=49.0, startup_s=13.0,
+        sec_per_mpx=43.0, startup_s=3.9,
     ),
     Model(
         id="4xLSDIRCompactC3", label="4x LSDIR Compact C3", scales=(4,),
@@ -201,7 +205,7 @@ MODELS: tuple[Model, ...] = (
         author="Phhofm", licence="CC-BY-4.0",
         url="https://openmodeldb.info/models/4x-LSDIRCompactC3",
         base_url=_CUSTOM, param_bytes=2767, bin_bytes=1247368,
-        sec_per_mpx=5.0, startup_s=1.5,
+        sec_per_mpx=2.2, startup_s=1.0,
     ),
     Model(
         id="4xHFA2k", label="4x HFA2k", scales=(4,),
@@ -209,7 +213,7 @@ MODELS: tuple[Model, ...] = (
         author="Phhofm", licence="CC-BY-4.0",
         url="https://openmodeldb.info/models/4x-HFA2k",
         base_url=_CUSTOM, param_bytes=108039, bin_bytes=33424520,
-        sec_per_mpx=49.0, startup_s=13.0,
+        sec_per_mpx=43.0, startup_s=3.9,
     ),
     Model(
         id="RealESRGAN_General_x4_v3", label="Real-ESRGAN General v3", scales=(4,),
@@ -217,7 +221,7 @@ MODELS: tuple[Model, ...] = (
         author="Xintao Wang et al.", licence="BSD-3-Clause",
         url="https://github.com/xinntao/Real-ESRGAN",
         base_url=_CUSTOM, param_bytes=5019, bin_bytes=2435272,
-        sec_per_mpx=8.7, startup_s=1.7,
+        sec_per_mpx=3.5, startup_s=1.2,
     ),
     Model(
         id="uniscale_restore", label="Uniscale Restore", scales=(4,),
@@ -225,7 +229,7 @@ MODELS: tuple[Model, ...] = (
         author="Kim2091", licence="CC-BY-NC-SA-4.0",
         url="https://openmodeldb.info/",
         base_url=_CUSTOM, param_bytes=108039, bin_bytes=33424520,
-        sec_per_mpx=49.0, startup_s=13.0,
+        sec_per_mpx=43.0, startup_s=3.9,
     ),
 )
 
