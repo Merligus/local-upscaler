@@ -70,7 +70,9 @@ def _list_models() -> int:
         have = all(fetch.have_model(m, s) for s in m.scales)
         some = any(fetch.have_model(m, s) for s in m.scales)
         status = "downloaded" if have else ("partial" if some else "-")
-        print(f"{m.id:<32} {scale:<8} {m.download_bytes / 1048576:7.1f}M  {status}")
+        # --fetch-models pulls every scale a model supports, so total them.
+        size = sum(m.download_bytes(s) for s in m.scales)
+        print(f"{m.id:<32} {scale:<8} {size / 1048576:7.1f}M  {status}")
         print(f"{'':<32} {m.blurb}")
     print()
     print("Fetch one with:  python3 -m local_upscaler --fetch-models <MODEL>")
@@ -175,7 +177,8 @@ def _bench(names: list[str]) -> int:
                 elapsed = time.monotonic() - start
                 print(f"{model.id:<28} {width}x{height:>7} {result.tiles:>6} "
                       f"{elapsed:>8.1f}s {result.sec_per_mpx:>7.1f}")
-                settings.calibration.record(model.id, scale, result.sec_per_mpx)
+                settings.calibration.record(model.id, scale, result.sec_per_mpx,
+                                            settings.device)
     st.save(settings)
     print("\nRecorded. The app's time estimates now use these numbers.")
     return 0

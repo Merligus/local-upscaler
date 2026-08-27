@@ -134,9 +134,36 @@ def test_calibration_blending():
     check(c.get("m", 4) == blended, "a zero measurement is ignored")
     c.record("m", 4, -5)
     check(c.get("m", 4) == blended, "a negative measurement is ignored")
+
     check(c.get("m", 2) is None, "rates are keyed by scale as well as model")
     check(st.Calibration.from_dict({"m@4": "abc"}).rates == {},
           "an unparseable rate is dropped")
+
+
+def test_calibration_is_keyed_by_device():
+    """CPU and GPU are an order of magnitude apart; they cannot share a rate.
+
+    Sharing one meant that toggling Advanced -> Device silently corrupted the
+    estimate for the other setting, and the exponential blend made it take
+    several runs to recover.
+    """
+    print("\ncalibration separates CPU from GPU")
+    c = st.Calibration()
+    c.record("m", 4, 43.0, "auto")
+    c.record("m", 4, 900.0, "cpu")
+    check(c.get("m", 4, "auto") == 43.0, "the GPU rate is unaffected by a CPU run")
+    check(c.get("m", 4, "cpu") == 900.0, "the CPU rate is stored separately")
+    check(len(c.rates) == 2, "two distinct keys are stored")
+
+    # Keys collected before the device distinction existed must still be read,
+    # rather than silently discarded and re-measured.
+    legacy = st.Calibration.from_dict({"m@4": 43.0})
+    check(legacy.get("m", 4, "auto") == 43.0,
+          "a bare model@scale key from an older version is still used for GPU")
+    check(legacy.get("m", 4, "cpu") is None,
+          "but it is not mistaken for a CPU measurement")
+    check(st.Calibration.key("m", 4, "auto") == "m@4", "the GPU key form is unchanged")
+    check(st.Calibration.key("m", 4, "cpu") == "m@4/cpu", "the CPU key is suffixed")
 
 
 def test_throughput_is_size_independent():
@@ -203,7 +230,8 @@ def test_disk_round_trip():
 def main():
     for fn in (test_defaults, test_round_trip, test_garbage_tolerance, test_clamping,
                test_scale_must_match_model, test_output_scale, test_unknown_keys_survive,
-               test_calibration_blending, test_throughput_is_size_independent,
+               test_calibration_blending, test_calibration_is_keyed_by_device,
+               test_throughput_is_size_independent,
                test_estimate_uses_calibration, test_disk_round_trip):
         fn()
     print(f"\n{'FAILED: ' + str(len(FAILS)) if FAILS else 'all passed'}")

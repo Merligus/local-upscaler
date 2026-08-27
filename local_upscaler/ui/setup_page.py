@@ -331,7 +331,7 @@ class SetupPage(QWidget):
                 f"megapixels, which will not fit in memory. Try a smaller scale.")
             return
 
-        rate = self._settings.calibration.get(model.id, scale)
+        rate = self._settings.calibration.get(model.id, scale, self._settings.device)
         seconds = runner.estimate_seconds(model, width, height, rate)
         if self._settings.tta:
             seconds *= 8

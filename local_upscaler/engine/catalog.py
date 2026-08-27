@@ -27,7 +27,7 @@ is also the only model here that can do 2x and 3x at all.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 #: Where each repository's model directory lives, as a raw-content URL prefix.
 _UPSCAYL = "https://raw.githubusercontent.com/upscayl/upscayl/main/resources/models/"
@@ -55,8 +55,14 @@ class Model:
     url: str
     #: Raw-content prefix the file pair is fetched from.
     base_url: str
-    param_bytes: int
-    bin_bytes: int
+    #: Exact `(param_bytes, bin_bytes)` for each supported scale.
+    #:
+    #: Keyed by scale because the sizes genuinely differ between a model's own
+    #: variants: `realesr-animevideov3`'s x4 parameter file is 3077 bytes where
+    #: its x2 and x3 are 3173. Storing one pair per model instead of one per
+    #: scale is exactly the bug this shape prevents — it made every x4 download
+    #: of that model fail the size check with "expected 3173 bytes, got 3077".
+    sizes: dict[int, tuple[int, int]] = field(hash=False)
     #: Seconds per input megapixel — a *prior*, replaced by measurement after
     #: the first real run. See `settings.Calibration`.
     sec_per_mpx: float
@@ -65,10 +71,18 @@ class Model:
     #: `runner` sends every tile through a single subprocess invocation.
     startup_s: float
 
-    @property
-    def download_bytes(self) -> int:
+    def file_sizes(self, scale: int) -> tuple[int, int]:
+        """`(param_bytes, bin_bytes)` for `scale`.
+
+        Falls back to the default scale rather than raising: a settings file
+        naming a scale this model no longer lists should not crash the picker.
+        """
+        return self.sizes.get(scale) or self.sizes[self.default_scale()]
+
+    def download_bytes(self, scale: int | None = None) -> int:
         """Total bytes for one scale's file pair."""
-        return self.param_bytes + self.bin_bytes
+        param, binary = self.file_sizes(self.default_scale() if scale is None else scale)
+        return param + binary
 
     def stem(self, scale: int) -> str:
         """Basename of the file pair for `scale`, without extension."""
@@ -108,7 +122,7 @@ MODELS: tuple[Model, ...] = (
         blurb="General-purpose photos. Real-ESRGAN x4plus — the safe default.",
         author="Xintao Wang et al.", licence="BSD-3-Clause",
         url="https://github.com/xinntao/Real-ESRGAN",
-        base_url=_UPSCAYL, param_bytes=116029, bin_bytes=33424520,
+        base_url=_UPSCAYL, sizes={4: (116029, 33424520)},
         sec_per_mpx=43.0, startup_s=3.9,
     ),
     Model(
@@ -116,7 +130,7 @@ MODELS: tuple[Model, ...] = (
         blurb="Crisp detail and texture. Strongest on JPEG-compressed sources.",
         author="Kim2091", licence="CC-BY-NC-SA-4.0",
         url="https://openmodeldb.info/models/4x-UltraSharp",
-        base_url=_UPSCAYL, param_bytes=116029, bin_bytes=33424520,
+        base_url=_UPSCAYL, sizes={4: (116029, 33424520)},
         sec_per_mpx=43.0, startup_s=3.9,
     ),
     Model(
@@ -124,7 +138,7 @@ MODELS: tuple[Model, ...] = (
         blurb="Photographic detail without the plastic over-smoothing.",
         author="FoolhardyVEVO", licence="CC-BY-NC-SA-4.0",
         url="https://openmodeldb.info/models/4x-Remacri",
-        base_url=_UPSCAYL, param_bytes=140295, bin_bytes=33424520,
+        base_url=_UPSCAYL, sizes={4: (140295, 33424520)},
         sec_per_mpx=43.0, startup_s=3.9,
     ),
     Model(
@@ -132,7 +146,7 @@ MODELS: tuple[Model, ...] = (
         blurb="A gentler blend. Less aggressive than UltraSharp on faces and skin.",
         author="Kim2091", licence="CC-BY-NC-SA-4.0",
         url="https://openmodeldb.info/models/4x-UltraMix-Balanced",
-        base_url=_UPSCAYL, param_bytes=140295, bin_bytes=33424520,
+        base_url=_UPSCAYL, sizes={4: (140295, 33424520)},
         sec_per_mpx=43.0, startup_s=3.9,
     ),
     Model(
@@ -140,7 +154,7 @@ MODELS: tuple[Model, ...] = (
         blurb="Stays closest to the source. Invents the least new detail.",
         author="Upscayl", licence="see OpenModelDB",
         url="https://openmodeldb.info/",
-        base_url=_UPSCAYL, param_bytes=108039, bin_bytes=33424520,
+        base_url=_UPSCAYL, sizes={4: (108039, 33424520)},
         sec_per_mpx=43.0, startup_s=3.9,
     ),
     Model(
@@ -148,7 +162,7 @@ MODELS: tuple[Model, ...] = (
         blurb="Illustration, flat colour and line art. Not for photographs.",
         author="Upscayl", licence="see OpenModelDB",
         url="https://openmodeldb.info/",
-        base_url=_UPSCAYL, param_bytes=30290, bin_bytes=8943500,
+        base_url=_UPSCAYL, sizes={4: (30290, 8943500)},
         sec_per_mpx=13.0, startup_s=2.5,
     ),
     Model(
@@ -156,7 +170,7 @@ MODELS: tuple[Model, ...] = (
         blurb="Roughly ten times faster, slightly softer. Good for a quick look.",
         author="Upscayl", licence="see OpenModelDB",
         url="https://openmodeldb.info/",
-        base_url=_UPSCAYL, param_bytes=5019, bin_bytes=2435272,
+        base_url=_UPSCAYL, sizes={4: (5019, 2435272)},
         sec_per_mpx=3.5, startup_s=1.2,
     ),
     Model(
@@ -164,7 +178,8 @@ MODELS: tuple[Model, ...] = (
         blurb="Anime and cartoons. Very fast, and the only model here that does 2x and 3x.",
         author="Xintao Wang et al.", licence="BSD-3-Clause",
         url="https://github.com/xinntao/Real-ESRGAN/blob/master/docs/anime_video_model.md",
-        base_url=_CUSTOM, param_bytes=3173, bin_bytes=1247368,
+        base_url=_CUSTOM, sizes={2: (3173, 1247368), 3: (3173, 1247368),
+               4: (3077, 1247368)},
         sec_per_mpx=2.2, startup_s=1.0,
     ),
     Model(
@@ -172,7 +187,7 @@ MODELS: tuple[Model, ...] = (
         blurb="Photorealistic, trained on a modern high-resolution photo set.",
         author="Phhofm", licence="CC-BY-4.0",
         url="https://openmodeldb.info/models/4x-Nomos8kSC",
-        base_url=_CUSTOM, param_bytes=108039, bin_bytes=33424520,
+        base_url=_CUSTOM, sizes={4: (108039, 33424520)},
         sec_per_mpx=43.0, startup_s=3.9,
     ),
     Model(
@@ -180,7 +195,7 @@ MODELS: tuple[Model, ...] = (
         blurb="Clean or lightly compressed photos. Strong detail, slower.",
         author="NMKD", licence="CC-BY-NC-SA-4.0",
         url="https://openmodeldb.info/models/4x-NMKD-Siax-CX",
-        base_url=_CUSTOM, param_bytes=108037, bin_bytes=66793352,
+        base_url=_CUSTOM, sizes={4: (108037, 66793352)},
         sec_per_mpx=86.0, startup_s=6.0,
     ),
     Model(
@@ -188,7 +203,7 @@ MODELS: tuple[Model, ...] = (
         blurb="Artifact-free real-world images. Gentle, slower.",
         author="NMKD", licence="CC-BY-NC-SA-4.0",
         url="https://openmodeldb.info/models/4x-NMKD-Superscale",
-        base_url=_CUSTOM, param_bytes=108037, bin_bytes=66793352,
+        base_url=_CUSTOM, sizes={4: (108037, 66793352)},
         sec_per_mpx=86.0, startup_s=6.0,
     ),
     Model(
@@ -196,7 +211,7 @@ MODELS: tuple[Model, ...] = (
         blurb="High quality on compressed sources. Trained on the LSDIR set.",
         author="Phhofm", licence="CC-BY-4.0",
         url="https://openmodeldb.info/models/4x-LSDIRplusC",
-        base_url=_CUSTOM, param_bytes=108039, bin_bytes=33424520,
+        base_url=_CUSTOM, sizes={4: (108039, 33424520)},
         sec_per_mpx=43.0, startup_s=3.9,
     ),
     Model(
@@ -204,7 +219,7 @@ MODELS: tuple[Model, ...] = (
         blurb="Compact network: fast, handles compression artifacts well.",
         author="Phhofm", licence="CC-BY-4.0",
         url="https://openmodeldb.info/models/4x-LSDIRCompactC3",
-        base_url=_CUSTOM, param_bytes=2767, bin_bytes=1247368,
+        base_url=_CUSTOM, sizes={4: (2767, 1247368)},
         sec_per_mpx=2.2, startup_s=1.0,
     ),
     Model(
@@ -212,7 +227,7 @@ MODELS: tuple[Model, ...] = (
         blurb="Anime stills and artwork, rather than video frames.",
         author="Phhofm", licence="CC-BY-4.0",
         url="https://openmodeldb.info/models/4x-HFA2k",
-        base_url=_CUSTOM, param_bytes=108039, bin_bytes=33424520,
+        base_url=_CUSTOM, sizes={4: (108039, 33424520)},
         sec_per_mpx=43.0, startup_s=3.9,
     ),
     Model(
@@ -220,7 +235,7 @@ MODELS: tuple[Model, ...] = (
         blurb="Compact general-purpose net. Fast, marginally softer than Standard.",
         author="Xintao Wang et al.", licence="BSD-3-Clause",
         url="https://github.com/xinntao/Real-ESRGAN",
-        base_url=_CUSTOM, param_bytes=5019, bin_bytes=2435272,
+        base_url=_CUSTOM, sizes={4: (5019, 2435272)},
         sec_per_mpx=3.5, startup_s=1.2,
     ),
     Model(
@@ -228,7 +243,7 @@ MODELS: tuple[Model, ...] = (
         blurb="Restoration of degraded or noisy originals.",
         author="Kim2091", licence="CC-BY-NC-SA-4.0",
         url="https://openmodeldb.info/",
-        base_url=_CUSTOM, param_bytes=108039, bin_bytes=33424520,
+        base_url=_CUSTOM, sizes={4: (108039, 33424520)},
         sec_per_mpx=43.0, startup_s=3.9,
     ),
 )

@@ -50,24 +50,44 @@ class Calibration:
     rates: dict[str, float] = field(default_factory=dict)
 
     @staticmethod
-    def key(model_id: str, scale: int) -> str:
-        return f"{model_id}@{scale}"
+    def key(model_id: str, scale: int, device: str = "auto") -> str:
+        """Storage key. Includes the device, because it changes the answer.
 
-    def get(self, model_id: str, scale: int) -> float | None:
-        v = self.rates.get(self.key(model_id, scale))
+        A CPU run of the same model at the same scale is an order of magnitude
+        slower than a GPU one. Sharing a key between them means switching
+        **Device** in Advanced silently corrupts the estimate for the other
+        setting — and the blend makes it take several runs to recover.
+
+        The GPU key keeps the original bare `model@scale` form so calibration
+        collected before this distinction existed is still read, rather than
+        being discarded and re-measured.
+        """
+        return f"{model_id}@{scale}" if device != "cpu" else f"{model_id}@{scale}/cpu"
+
+    def get(self, model_id: str, scale: int, device: str = "auto") -> float | None:
+        v = self.rates.get(self.key(model_id, scale, device))
         return v if isinstance(v, (int, float)) and v > 0 else None
 
-    def record(self, model_id: str, scale: int, sec_per_mpx: float) -> None:
+    def record(self, model_id: str, scale: int, sec_per_mpx: float,
+               device: str = "auto") -> None:
         """Blend a new measurement into the stored one.
 
         An exponential average rather than a replacement: one run that happened
         to share the GPU with a game should not throw the estimate off for
         every run after it, and one that got a warm shader cache should not
         make the estimate permanently optimistic.
+
+        There is deliberately **no** outlier rejection here. The obvious guard —
+        discard anything far from the catalog's prior — cannot be given a
+        defensible threshold: CPU mode is legitimately 10-50x slower than the
+        GPU the priors were measured on, so any band tight enough to catch a
+        genuinely wrong figure also rejects a real CPU user's calibration
+        forever. Keying by device instead removes the reason such figures
+        appeared, which is the honest fix.
         """
         if not (sec_per_mpx and sec_per_mpx > 0):
             return
-        k = self.key(model_id, scale)
+        k = self.key(model_id, scale, device)
         prev = self.rates.get(k)
         self.rates[k] = (0.6 * prev + 0.4 * sec_per_mpx
                          if isinstance(prev, (int, float)) and prev > 0

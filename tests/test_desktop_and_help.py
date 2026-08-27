@@ -173,8 +173,37 @@ def test_help_needs_no_gui():
     check(r.returncode == 0, "--help works even with a broken Qt platform set")
 
 
+def test_result_is_attributed_to_the_job_that_ran():
+    """A run that finishes after the model combo moved on must not be relabelled.
+
+    The setup page stays interactive while a run is in flight, so its widgets
+    are not a record of what was started. Rebuilding the job from them on
+    completion attributed the result — and its measured throughput — to whatever
+    model happened to be selected when it landed, which put a 339 s/MP figure
+    into the calibration for a 43 s/MP model.
+    """
+    print("\nthe result belongs to the job that ran, not the current selection")
+    from local_upscaler.ui.main_window import MainWindow
+
+    window = MainWindow()
+    window._setup._model.setCurrentIndex(window._setup._model.findData("upscayl-lite-4x"))
+    job = window._setup.build_job()
+    window._job = job                       # as _start() would record it
+
+    # The user changes their mind while the run is still going.
+    window._setup._model.setCurrentIndex(
+        window._setup._model.findData("high-fidelity-4x"))
+    check(window._setup.build_job().model.id == "high-fidelity-4x",
+          "the setup page now reports a different model, as the user selected")
+    check(window._job.model.id == "upscayl-lite-4x",
+          "but the running job still names the model that was actually started")
+    window._teardown()
+    check(window._job is None, "tearing down clears the remembered job")
+
+
 def main():
     for fn in (test_icon_asset, test_install_and_uninstall,
+               test_result_is_attributed_to_the_job_that_ran,
                test_uninstall_keeps_downloads, test_cli, test_help_needs_no_gui):
         fn()
     print(f"\n{'FAILED: ' + str(len(FAILS)) if FAILS else 'all passed'}")

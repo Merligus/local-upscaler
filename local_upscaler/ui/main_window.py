@@ -68,6 +68,11 @@ class MainWindow(QMainWindow):
         self._settings = st.load()
         self._thread: QThread | None = None
         self._worker: UpscaleWorker | None = None
+        #: The job currently running. The setup page keeps taking input while a
+        #: run is in flight, so its widgets are NOT a record of what was started
+        #: — rebuilding the job from them on completion attributes the result to
+        #: whatever model happens to be selected when it lands.
+        self._job: runner.Job | None = None
         #: Keeps the QImage buffers alive. See `pil_to_qimage`.
         self._buffers: list[bytes] = []
 
@@ -112,10 +117,12 @@ class MainWindow(QMainWindow):
             return
 
         job = self._setup.build_job()
+        self._job = job
         st.save(self._settings)
 
         width, height = self._setup.source_size
-        rate = self._settings.calibration.get(job.model.id, job.scale)
+        rate = self._settings.calibration.get(job.model.id, job.scale,
+                                      self._settings.device)
         prior = runner.estimate_seconds(job.model, width, height, rate)
         if job.tta:
             prior *= 8
@@ -144,6 +151,7 @@ class MainWindow(QMainWindow):
         self._progress.end()
         thread, self._thread = self._thread, None
         worker, self._worker = self._worker, None
+        self._job = None
         if thread is not None:
             thread.quit()
             thread.wait(5000)
@@ -153,10 +161,13 @@ class MainWindow(QMainWindow):
 
     # -- outcomes ---------------------------------------------------------
     def _on_finished(self, result: runner.Result) -> None:
-        job = self._setup.build_job()
+        job = self._job
         self._teardown()
+        if job is None:               # cancelled and torn down under us
+            return
 
-        self._settings.calibration.record(job.model.id, job.scale, result.sec_per_mpx)
+        self._settings.calibration.record(job.model.id, job.scale,
+                                  result.sec_per_mpx, job.model.sec_per_mpx)
         st.save(self._settings)
 
         upscaled, buffer = pil_to_qimage(result.image)

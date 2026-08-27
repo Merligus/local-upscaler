@@ -106,6 +106,16 @@ def _download(url: str, dest: Path, expect_bytes: int | None = None,
 
 
 # ---------------------------------------------------------------- models
+def _expected(model: Model, scale: int) -> dict[str, int]:
+    """Filename -> its exact byte size, for one scale.
+
+    The single place that pairs a model's filenames with their sizes. It used to
+    be written out at each call site, which is how a model whose scales have
+    different file sizes slipped through.
+    """
+    return dict(zip(model.filenames(scale), model.file_sizes(scale)))
+
+
 def model_paths(model: Model, scale: int) -> list[Path]:
     """The files `model` needs on disk to run at `scale`."""
     d = paths.models_dir()
@@ -119,8 +129,7 @@ def missing(model: Model, scale: int) -> list[Path]:
     module existed — or a file truncated by a full disk — is re-downloaded
     rather than handed to the engine.
     """
-    expected = dict(zip(model.filenames(scale),
-                       (model.param_bytes, model.bin_bytes)))
+    expected = _expected(model, scale)
     out = []
     for p in model_paths(model, scale):
         try:
@@ -137,7 +146,7 @@ def have_model(model: Model, scale: int) -> bool:
 
 def download_size(model: Model, scale: int) -> int:
     """Bytes still to fetch for `model` at `scale`. Zero when it is ready."""
-    expected = dict(zip(model.filenames(scale), (model.param_bytes, model.bin_bytes)))
+    expected = _expected(model, scale)
     return sum(expected[p.name] for p in missing(model, scale))
 
 
@@ -147,7 +156,7 @@ def fetch_model(model: Model, scale: int, progress: ProgressCb | None = None,
     todo = missing(model, scale)
     if not todo:
         return
-    expected = dict(zip(model.filenames(scale), (model.param_bytes, model.bin_bytes)))
+    expected = _expected(model, scale)
     total = sum(expected[p.name] for p in todo)
     base = 0
     for path in todo:

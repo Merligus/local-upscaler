@@ -175,11 +175,19 @@ python3 tests/test_tiling.py            # the tile geometry — the load-bearing
 python3 tests/test_catalog.py
 python3 tests/test_settings.py
 python3 tests/test_desktop_and_help.py
+
+python3 tests/test_catalog_remote.py    # needs network — see below
 ```
+
+`test_catalog_remote.py` is the only one that touches the network. It `HEAD`s
+every model file and checks its length against the catalog, because `fetch`
+rejects any download whose size does not match exactly — so a wrong number makes
+a model permanently un-downloadable, and no offline test can tell. Run it after
+editing the catalog.
 
 No test framework: each file is a standalone script that prints `PASS`/`FAIL` and
 exits non-zero if anything failed, matching the soundboard project's convention.
-They need no display, no GPU and no network.
+They need no display and no GPU; only the remote one needs network.
 
 | Document | What it covers |
 |---|---|

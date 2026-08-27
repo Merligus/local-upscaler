@@ -75,3 +75,6 @@ extraction, re-encoding and audio passthrough are most of the work.
 * **TTA is offered but untested at length.** It is upstream's `-x` flag; the 8x
   cost estimate is upstream's claim, not measured here.
 * **No way to cancel a download** from the CLI, only from the GUI.
+* **Catalog sizes are hand-maintained.** `tests/test_catalog_remote.py` checks
+  them against the servers, but nothing runs it automatically, so an upstream
+  re-export would not be noticed until a download failed.

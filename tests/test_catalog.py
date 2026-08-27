@@ -44,7 +44,7 @@ def test_fields_are_populated():
         ok = (m.label and m.blurb and m.author and m.licence
               and m.url.startswith("https://")
               and m.base_url.startswith("https://")
-              and m.param_bytes > 0 and m.bin_bytes > 0
+              and m.sizes and all(p > 0 and b > 0 for p, b in m.sizes.values())
               and m.sec_per_mpx > 0 and m.startup_s > 0
               and m.scales and all(1 <= s <= 8 for s in m.scales))
         check(bool(ok), f"{m.id} has every field populated and sane")
@@ -60,10 +60,45 @@ def test_blurbs_are_useful():
 def test_download_size():
     print("\ndownload sizes")
     for m in cat.MODELS:
-        check(m.download_bytes == m.param_bytes + m.bin_bytes,
+        param, binary = m.file_sizes(m.default_scale())
+        check(m.download_bytes() == param + binary,
               f"{m.id}: download_bytes is param + bin")
-    total = sum(m.download_bytes for m in cat.MODELS)
+    total = sum(sum(m.download_bytes(s) for s in m.scales) for m in cat.MODELS)
     check(300e6 < total < 600e6, f"the whole catalog is {total/1048576:.0f} MB")
+
+
+def test_sizes_are_declared_for_every_scale():
+    """The regression guard for the animevideov3 x4 download failure.
+
+    `sizes` used to be a single (param, bin) pair per model. That is wrong for
+    any model whose scale variants are different files: realesr-animevideov3's
+    x4 parameter file is 3077 bytes where its x2 and x3 are 3173, so every x4
+    download failed its size check with "expected 3173 bytes, got 3077" — and
+    x4 is the default scale, so the model was simply unusable.
+    """
+    print("\nsizes are declared per scale, not per model")
+    for m in cat.MODELS:
+        check(set(m.sizes) == set(m.scales),
+              f"{m.id}: declares a size for exactly its supported scales "
+              f"({sorted(m.sizes)} vs {list(m.scales)})")
+        for scale in m.scales:
+            param, binary = m.file_sizes(scale)
+            check(param > 0 and binary > 0,
+                  f"{m.id} @{scale}x: both files have a positive size")
+
+    # The specific case, pinned to the values read from the server.
+    anime = cat.get(cat.SCALED_FILENAME_MODEL)
+    check(anime.file_sizes(2) == (3173, 1247368), "animevideov3 x2 is (3173, 1247368)")
+    check(anime.file_sizes(3) == (3173, 1247368), "animevideov3 x3 is (3173, 1247368)")
+    check(anime.file_sizes(4) == (3077, 1247368),
+          "animevideov3 x4 is (3077, 1247368) — different from x2/x3, which is the bug")
+    check(anime.file_sizes(2) != anime.file_sizes(4),
+          "the scales genuinely differ, so one pair per model cannot be right")
+
+    # An unknown scale must fall back rather than raise, so a stale settings
+    # file cannot crash the model picker.
+    check(anime.file_sizes(9) == anime.file_sizes(anime.default_scale()),
+          "an unsupported scale falls back to the default instead of raising")
 
 
 def test_filenames():
@@ -114,7 +149,8 @@ def test_licences_are_stated():
 
 def main():
     for fn in (test_identity, test_fields_are_populated, test_blurbs_are_useful,
-               test_download_size, test_filenames, test_only_animevideo_is_multiscale,
+               test_download_size, test_sizes_are_declared_for_every_scale,
+               test_filenames, test_only_animevideo_is_multiscale,
                test_base_urls, test_licences_are_stated):
         fn()
     print(f"\n{'FAILED: ' + str(len(FAILS)) if FAILS else 'all passed'}")
