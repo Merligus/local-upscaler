@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Local Upscaler application icon.
+
+  Deliberately self-coloured: no `currentColor`, no `ColorScheme-*` classes. An
+  application icon is drawn by launchers, panels and task switchers on
+  backgrounds this app does not control and which do not recolour app icons, so
+  a palette-dependent icon is invisible half the time. (Toolbar icons inside the
+  app are the opposite case and are recoloured — see ui/icons.py.)
+
+  The subject is the operation itself: a coarse pixel grid in the middle, with
+  brackets pushing outward from every corner. It has to survive being drawn at
+  16x16, so there are five shapes and no fine detail.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4f7cf7"/>
+      <stop offset="1" stop-color="#8b5cf6"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="2" y="2" width="44" height="44" rx="10" fill="url(#bg)"/>
+
+  <!-- The low-resolution source: four chunky pixels, deliberately blocky. -->
+  <g fill="#ffffff">
+    <rect x="19" y="19" width="4.6" height="4.6" rx="0.6" opacity="0.95"/>
+    <rect x="24.4" y="19" width="4.6" height="4.6" rx="0.6" opacity="0.62"/>
+    <rect x="19" y="24.4" width="4.6" height="4.6" rx="0.6" opacity="0.62"/>
+    <rect x="24.4" y="24.4" width="4.6" height="4.6" rx="0.6" opacity="0.95"/>
+  </g>
+
+  <!-- Brackets pushing outward: the enlargement. -->
+  <g fill="none" stroke="#ffffff" stroke-width="3.1" stroke-linecap="round"
+     stroke-linejoin="round">
+    <path d="M 16 10 H 10 V 16"/>
+    <path d="M 32 10 H 38 V 16"/>
+    <path d="M 16 38 H 10 V 32"/>
+    <path d="M 32 38 H 38 V 32"/>
+  </g>
+</svg>
